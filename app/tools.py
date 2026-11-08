@@ -77,3 +77,41 @@ def get_lecture_summary(lecture: int) -> str:
         available = sorted(p.stem for p in (DATA_DIR / "lectures").glob("*.md"))
         return f"第{lecture}回の要点はまだありません。用意されている回: {', '.join(available)}"
     return path.read_text(encoding="utf-8")
+
+
+# 第3回 宿題（実装）: 学習の記録を保存するツール
+LOG_DIR = Path(__file__).resolve().parent.parent / "learning_log"
+MAX_LOG_CHARS = 5000
+
+
+def _safe_filename(title: str) -> str:
+    """ファイル名に使えない文字を「_」に置き換え、長すぎる題名を切り詰める。"""
+    cleaned = "".join("_" if c in '\\/:*?"<>|' or c.isspace() else c for c in title.strip())
+    return cleaned[:40] or "untitled"
+
+
+def save_learning_log(title: str, content: str) -> str:
+    """学習の記録（学んだこと・疑問・次にやること）を、learning_log/ フォルダに Markdown で保存する。
+
+    利用者が「今日学んだことを記録して」「この説明をメモに残して」のように、
+    記録や保存をはっきり頼んだときだけ使う。頼まれていないのに使わない。
+    title には記録の短い題名（例: "第3回 LoRAとQLoRA"）、content には保存する本文を入れる。
+    保存してよいかの確認はプログラムが自動で行うので、確認の質問はせず、そのままこのツールを呼ぶこと。
+    """
+    if not content.strip():
+        return "本文が空なので保存しませんでした。"
+    if len(content) > MAX_LOG_CHARS:
+        return f"本文が長すぎます（{len(content)}文字）。{MAX_LOG_CHARS}文字以内にまとめてください。"
+
+    from datetime import datetime
+
+    now = datetime.now()
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    path = LOG_DIR / f"{now:%Y%m%d-%H%M%S}_{_safe_filename(title)}.md"
+    # "x" モード：同名のファイルがあれば上書きせずにエラーにする
+    try:
+        with open(path, "x", encoding="utf-8") as f:
+            f.write(f"# {title.strip() or '無題'}\n\n- 保存日時: {now:%Y-%m-%d %H:%M:%S}\n\n{content.strip()}\n")
+    except FileExistsError:
+        return f"同じ名前のファイルがすでにあるため保存しませんでした: {path.name}"
+    return f"保存しました: learning_log/{path.name}"
